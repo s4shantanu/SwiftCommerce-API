@@ -2,9 +2,11 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
+from app.core.config import settings
+
 # 1. Database ka address (URL)
 # Format: postgresql+asyncpg://<username>:<password>@<host>:<port>/<db_name>
-SQLALCHEMY_DATABASE_URL = "postgresql+asyncpg://postgres:yourpassword@localhost/swiftcommerce"
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 # 2. Engine: Ye asli connector hai jo connection handle karta hai
 engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
