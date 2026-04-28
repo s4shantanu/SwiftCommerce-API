@@ -1,18 +1,15 @@
 from pydantic import BaseModel, EmailStr
 
-
-# Jab user register karega, ye data humein chahiye
-class UserCreate(BaseModel):
-    full_name: str
+class UserBase(BaseModel):
     email: EmailStr
+    full_name: str | None = None
+
+class UserCreate(UserBase):
     password: str
 
-# Jab hum user ka data wapas bhejenge (Response), tab password nahi bhejenge!
-class UserOut(BaseModel):
+class UserOut(UserBase):
     id: int
-    full_name: str
-    email: EmailStr
     is_active: bool
 
     class Config:
-        from_attributes = True # Ye SQLAlchemy model ko Pydantic mein convert karne ke liye hai
+        from_attributes = True
