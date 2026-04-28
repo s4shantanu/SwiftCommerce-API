@@ -1,13 +1,17 @@
 import json
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 import redis.asyncio as redis
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
+
 from app.core.config import settings
 from app.models.user import User
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
+from app.crud.product import get_products, create_product
+from app.schemas.product import ProductOut, ProductCreate
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
-# Dependency to get redis connection
 async def get_redis():
     r = redis.from_url(settings.REDIS_URL, decode_responses=True)
     try:
@@ -16,9 +20,9 @@ async def get_redis():
         await r.aclose()
 
 @router.get("/")
-async def get_products(
+async def read_products(
+    db: AsyncSession = Depends(get_db),
     redis_client: redis.Redis = Depends(get_redis),
-    current_user: User = Depends(get_current_user)
 ):
     """
     Fetch products, with Redis caching integration.
@@ -29,14 +33,22 @@ async def get_products(
     if cached_products:
         return {"source": "redis_cache", "data": json.loads(cached_products)}
     
-    # Simulate DB fetch
-    db_products = [
-        {"id": 1, "name": "Wireless Headphones", "price": 99.99},
-        {"id": 2, "name": "Mechanical Keyboard", "price": 129.50},
-        {"id": 3, "name": "Gaming Mouse", "price": 59.99},
-    ]
+    db_products = await get_products(db)
     
-    # Set in cache for 60 seconds
-    await redis_client.setex(cache_key, 60, json.dumps(db_products))
+    # Needs to be serialized to a dict for json.dumps
+    serializable_products = [{"id": p.id, "name": p.name, "price": p.price, "stock": p.stock, "category": p.category} for p in db_products]
     
-    return {"source": "database", "data": db_products}
+    await redis_client.setex(cache_key, 60, json.dumps(serializable_products))
+    
+    return {"source": "database", "data": serializable_products}
+
+@router.post("/", response_model=ProductOut)
+async def create_new_product(
+    product_in: ProductCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # Requires auth to map out dummy inserts realistically
+):
+    """
+    Create new product
+    """
+    return await create_product(db, product_in)
